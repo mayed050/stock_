@@ -1,0 +1,92 @@
+{
+  "as_of": "2025-08-09T12:00:00+03:41",
+  "source_urls": {
+    "DEWA": {
+      "mubasher": "https://www.mubasher.info/markets/DFM/stocks/DEWA",
+      "dfm_summary": "https://www.dfm.ae/ar/the-exchange/market-information/company/DEWA/trading/trading-summary",
+      "argaam": "https://www.argaam.com/ae-ar/companies/dfm/dewa/overview"
+    },
+    "SALIK": {
+      "mubasher": "https://www.mubasher.info/markets/DFM/stocks/SALIK",
+      "argaam": "https://www.argaam.com/ae-ar/companies/dfm/salik/overview"
+    },
+    "TALABAT": {
+      "mubasher": "https://www.mubasher.info/markets/DFM/stocks/TALABAT",
+      "dfm_summary": "https://www.dfm.ae/ar/the-exchange/market-information/company/TALABAT/trading/trading-summary",
+      "argaam": "https://www.argaam.com/ae-ar/companies/dfm/talabat/overview"
+    },
+    "NMDCENR": {
+      "adx": "https://www.adx.ae/ar-ae/main-market"
+    }
+  },
+  "stocks": {
+    "DEWA": {
+      "name": "Dubai Electricity & Water Authority PJSC",
+      "exchange": "DFM",
+      "sector": "Utilities",
+      "price": 2.74,
+      "change_pct": 0.37,
+      "volume": 10505303,
+      "turnover": 28895810.69,
+      "high": 2.77,
+      "low": 2.73,
+      "market_cap": null,
+      "eps_ttm": null,
+      "pe_ttm": null,
+      "roe": null,
+      "net_margin": null,
+      "timeseries": []
+    },
+    "SALIK": {
+      "name": "Salik Company PJSC",
+      "exchange": "DFM",
+      "sector": "Tolling/Transport Services",
+      "price": null,
+      "change_pct": null,
+      "volume": null,
+      "turnover": null,
+      "high": null,
+      "low": null,
+      "market_cap": 48600000000.0,
+      "eps_ttm": 0.18,
+      "pe_ttm": 36.52,
+      "roe": null,
+      "net_margin": null,
+      "timeseries": []
+    },
+    "TALABAT": {
+      "name": "Talabat Holding PLC",
+      "exchange": "DFM",
+      "sector": "Food Delivery / Retail",
+      "price": null,
+      "change_pct": null,
+      "volume": null,
+      "turnover": 40225321.35,
+      "high": 1.33,
+      "low": 1.27,
+      "market_cap": 30740477625.0,
+      "eps_ttm": 0.02,
+      "pe_ttm": 30.5,
+      "roe": null,
+      "net_margin": null,
+      "timeseries": []
+    },
+    "NMDCENR": {
+      "name": "NMDC Energy PJSC",
+      "exchange": "ADX",
+      "sector": "Energy EPC",
+      "price": null,
+      "change_pct": null,
+      "volume": null,
+      "turnover": null,
+      "high": null,
+      "low": null,
+      "market_cap": null,
+      "eps_ttm": null,
+      "pe_ttm": null,
+      "roe": null,
+      "net_margin": null,
+      "timeseries": []
+    }
+  }
+}

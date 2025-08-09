@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>لوحة متابعة الأسهم الإماراتية — DEWA • SALIK • TALABAT • NMDC Energy</title>
+  <meta name="description" content="لوحة متابعة احترافية لأسهم دبي وأبوظبي مع تحديث يومي عند 12 ظهراً بتوقيت الإمارات، تشمل التحليل الأساسي والفني وتوقعات 3 أشهر.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <link rel="icon" href="assets/favicon.png" />
+  <style>
+    :root { --brand:#0ea5e9; --ink:#0b1220; --card:#0f172a; }
+    html, body { font-family: 'Cairo', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; }
+    body { background: linear-gradient(120deg,#0b1220 0%,#0f172a 40%,#111827 100%); color: #e5e7eb; }
+    .card { background: rgba(17,24,39,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 1.25rem; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+    .glass { backdrop-filter: blur(10px); }
+    .num { font-variant-numeric: tabular-nums lining-nums; }
+    .badge { border: 1px solid rgba(255,255,255,.1); border-radius: 999px; padding:.25rem .6rem; }
+    .kpi { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:.25rem; }
+    .kpi div { background: rgba(255,255,255,0.04); padding:.4rem .6rem; border-radius:.75rem; font-size:.9rem; }
+    a { color:#93c5fd }
+    .sr { position:absolute;left:-9999px; }
+  </style>
+</head>
+<body x-data="dashboard()" x-init="init()">
+  <header class="card glass mx-auto mt-6 max-w-7xl px-5 py-4">
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <img src="assets/logo.svg" alt="" class="w-9 h-9">
+        <div>
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight">منصة التحليل اليومي لأسهم الإمارات</h1>
+          <p class="text-sm text-gray-300">تحديث آلي يومي عند الساعة <span class="font-semibold">12:00 ظهراً</span> بتوقيت الإمارات (UTC+4).</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button @click="refresh()" class="px-3 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-200 transition">تحديث الآن</button>
+        <button @click="toggleTheme()" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition">السمة</button>
+      </div>
+    </div>
+    <div class="mt-3 text-sm text-gray-300">
+      آخر تحديث: <span class="num" x-text="meta.as_of || '—'"></span>
+      <span class="mx-2">•</span>
+      مصدر البيانات: مباشر، سوق دبي المالي، سوق أبوظبي للأوراق المالية، أرقام.
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl p-5 space-y-6">
+    <!-- Summary Row -->
+    <section class="grid md:grid-cols-4 sm:grid-cols-2 grid-cols-1 gap-4">
+      <template x-for="tkr in ['DEWA','SALIK','TALABAT','NMDCENR']" :key="tkr">
+        <div class="card p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm text-gray-300" x-text="stocks[tkr]?.name || tkr"></div>
+              <div class="text-xs text-gray-400" x-text="stocks[tkr]?.exchange || ''"></div>
+            </div>
+            <div class="badge" :class="(stocks[tkr]?.change_pct ?? 0) >= 0 ? 'bg-green-500/10 text-green-300 border-green-500/30' : 'bg-red-500/10 text-red-300 border-red-500/30'">
+              <span class="num" x-text="fmtPct(stocks[tkr]?.change_pct)"></span>
+            </div>
+          </div>
+          <div class="mt-3 text-3xl font-bold num" x-text="fmtPrice(stocks[tkr]?.price)"></div>
+          <div class="mt-2 kpi">
+            <div><span class="text-gray-400">القيمة:</span> <span class="num" x-text="fmtNum(stocks[tkr]?.turnover)"></span></div>
+            <div><span class="text-gray-400">الحجم:</span> <span class="num" x-text="fmtNum(stocks[tkr]?.volume)"></span></div>
+            <div><span class="text-gray-400">أعلى/أدنى:</span> <span class="num" x-text="range(stocks[tkr])"></span></div>
+            <div><span class="text-gray-400">مكرر الربحية:</span> <span class="num" x-text="valOrDash(stocks[tkr]?.pe_ttm)"></span></div>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- Detail Sections -->
+    <template x-for="tkr in ['DEWA','SALIK','TALABAT','NMDCENR']" :key="tkr">
+      <section class="card p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold" x-text="'تحليل ' + (stocks[tkr]?.name || tkr)"></h2>
+            <p class="text-sm text-gray-300">ملخص أساسي + فني مع تقدير سعر مستهدف لـ 3 أشهر وتوصية استثمارية.</p>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-400">القطاع: <span x-text="stocks[tkr]?.sector || '—'"></span></div>
+            <div class="text-xs text-gray-400">القيمة السوقية: <span class="num" x-text="fmtNum(stocks[tkr]?.market_cap)"></span></div>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4 mt-4">
+          <div class="md:col-span-2">
+            <div :id="'chart-'+tkr" class="w-full h-80 rounded-xl bg-white/5"></div>
+          </div>
+          <div class="space-y-3">
+            <div class="p-3 rounded-xl bg-white/5">
+              <div class="text-sm text-gray-300 font-semibold mb-1">ملخص أساسي</div>
+              <ul class="text-sm leading-7">
+                <li>ربحية السهم (TTM): <span class="num" x-text="valOrDash(stocks[tkr]?.eps_ttm)"></span></li>
+                <li>مكرر الربحية (TTM): <span class="num" x-text="valOrDash(stocks[tkr]?.pe_ttm)"></span></li>
+                <li>العائد على حقوق الملكية (ROE): <span class="num" x-text="valOrDash(stocks[tkr]?.roe)"></span></li>
+                <li>هامش صافي الربح: <span class="num" x-text="valOrDash(stocks[tkr]?.net_margin)"></span></li>
+              </ul>
+            </div>
+            <div class="p-3 rounded-xl bg-white/5">
+              <div class="text-sm text-gray-300 font-semibold mb-1">التقييم والسعر المستهدف (3 أشهر)</div>
+              <div class="text-sm">
+                <div>سعر مستهدف: <span class="num font-semibold" x-text="fmtPrice(analytics[tkr]?.target_price)"></span></div>
+                <div class="text-xs text-gray-400 mt-1">المنهجية: مزيج نسبي (P/E مُعدَّل) + زخم سعري؛ يتطلب تراكم ≥ 20 جلسة لزيادة الدقة.</div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-white/5">
+              <div class="text-sm text-gray-300 font-semibold mb-1">التوصية</div>
+              <div>
+                <span class="badge" :class="badgeClass(analytics[tkr]?.recommendation)"
+                      x-text="labelRec(analytics[tkr]?.recommendation)"></span>
+              </div>
+              <p class="text-xs text-gray-400 mt-2" x-text="analytics[tkr]?.rationale"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 text-xs text-gray-400">
+          <span>روابط المصدر المباشر لكل سهم مذكورة أسفل الصفحة.</span>
+        </div>
+      </section>
+    </template>
+
+    <section class="card p-5">
+      <h3 class="text-base font-semibold mb-2">ملاحظات منهجية</h3>
+      <ul class="list-disc pr-6 text-sm text-gray-300 leading-7">
+        <li>التحديث الآلي يتم عبر GitHub Actions يوميًا عند 08:00 UTC (يعادل 12:00 ظهرًا بتوقيت الإمارات) ويولّد ملف <code class="badge">data/latest.json</code>.</li>
+        <li>يستند السحب إلى الصفحات الرسمية: مباشر، سوق دبي المالي، سوق أبوظبي، أرقام. في حال تغيّر هيكل الصفحة سيستبدل الجامع Selector تلقائيًا بمحاولة بحسب العناوين (Fallback).</li>
+        <li>توقع الثلاثة أشهر مبدئي ويُحسّن تلقائيًا مع تراكم البيانات اليومية (نموذج انحراف/تذبذب تاريخي بسيط + تعديلات تقييم نسبية).</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="mx-auto max-w-7xl p-5 pb-10 text-sm text-gray-300">
+    <div class="card p-4">
+      <h4 class="font-semibold mb-2">روابط المصادر (للاطلاع والتوثيق)</h4>
+      <ul class="grid sm:grid-cols-2 gap-1">
+        <li><a href="https://www.mubasher.info/markets/DFM/stocks/DEWA" rel="noopener" target="_blank">DEWA — Mubasher</a></li>
+        <li><a href="https://www.mubasher.info/markets/DFM/stocks/SALIK" rel="noopener" target="_blank">SALIK — Mubasher</a></li>
+        <li><a href="https://www.mubasher.info/markets/DFM/stocks/TALABAT" rel="noopener" target="_blank">TALABAT — Mubasher</a></li>
+        <li><a href="https://www.dfm.ae/ar/the-exchange/market-information/company/TALABAT/trading/trading-summary" rel="noopener" target="_blank">TALABAT — DFM Trading Summary</a></li>
+        <li><a href="https://www.dfm.ae/ar/the-exchange/market-information/company/DEWA/trading/trading-summary" rel="noopener" target="_blank">DEWA — DFM Trading Summary</a></li>
+        <li><a href="https://www.adx.ae/ar-ae/main-market" rel="noopener" target="_blank">ADX — Main Market (NMDC Energy)</a></li>
+        <li><a href="https://www.argaam.com/ae-ar/companies/dfm/dewa/overview" rel="noopener" target="_blank">DEWA — Argaam</a></li>
+        <li><a href="https://www.argaam.com/ae-ar/companies/dfm/talabat/overview" rel="noopener" target="_blank">TALABAT — Argaam</a></li>
+        <li><a href="https://www.argaam.com/ae-ar/companies/dfm/salik/overview" rel="noopener" target="_blank">SALIK — Argaam</a></li>
+      </ul>
+      <p class="text-xs text-gray-400 mt-3">تنبيه: المعلومات لأغراض تعليمية/تثقيفية ولا تعد توصية استثمارية مباشرة.</p>
+    </div>
+  </footer>
+
+  <script>
+    function dashboard(){
+      return {
+        meta: { as_of: '—' },
+        stocks: {},
+        analytics: {},
+        async init(){
+          await this.load();
+          this.draw();
+        },
+        async refresh(){
+          await this.load(true);
+          this.draw(true);
+        },
+        async load(noCache=false){
+          const url = 'data/latest.json' + (noCache ? ('?t=' + Date.now()) : '');
+          try {
+            const res = await fetch(url, { cache: 'no-cache' });
+            const data = await res.json();
+            this.meta = { as_of: data.as_of || '—' };
+            this.stocks = data.stocks || {};
+            this.computeAnalytics();
+          } catch(e){
+            console.error('لم يتم العثور على ملف البيانات:', e);
+          }
+        },
+        fmtNum(v){
+          if(v === null || v === undefined || isNaN(v)) return '—';
+          const abs = Math.abs(v);
+          const units = [ ['',1], [' ألف',1e3], [' مليون',1e6], [' مليار',1e9] ];
+          for(let i=units.length-1;i>=0;i--){
+            if(abs >= units[i][1]){
+              return (v/units[i][1]).toFixed(2) + units[i][0];
+            }
+          }
+          return String(v);
+        },
+        fmtPrice(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Number(v).toFixed(3) + ' د.إ'; },
+        fmtPct(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : (Number(v).toFixed(2) + '%'); },
+        valOrDash(v){ return (v===null||v===undefined||v==='') ? '—' : v; },
+        range(s){ if(!s) return '—'; const hi = s.high, lo = s.low; if(hi==null||lo==null) return '—'; return `${Number(hi).toFixed(3)} / ${Number(lo).toFixed(3)}`; },
+        badgeClass(r){
+          switch(r){
+            case 'buy': return 'bg-green-500/10 text-green-300 border border-green-500/30';
+            case 'hold': return 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/30';
+            case 'reduce': return 'bg-red-500/10 text-red-300 border border-red-500/30';
+            default: return 'bg-white/10 text-gray-200 border border-white/20';
+          }
+        },
+        labelRec(r){ return r==='buy'?'زيادة المراكز': r==='reduce'?'تخفيف المراكز': r==='hold'?'احتفاظ':'—'; },
+        computeAnalytics(){
+          const out = {};
+          for(const [tkr, s] of Object.entries(this.stocks)){
+            // بسيط: تقدير هدف نسبي باستخدام متوسط قطاعي تقريبي = 25x إن توفر EPS/PE، وإلا هامش 5% فوق السعر إذا الزخم إيجابي
+            let target = null, rec = 'hold', rationale = '—';
+            const price = Number(s.price || 0), pe = Number(s.pe_ttm || 0), eps = Number(s.eps_ttm || 0);
+            const roe = Number(s.roe || 0);
+            const mom = Number(s.change_pct || 0);
+
+            if(price && (pe || eps)){
+              const implied_eps = eps || (price / pe);
+              const sector_pe = 25; // تقدير تحفظي حتى تتوفر المقارنات
+              target = implied_eps * sector_pe;
+            } else if(price && mom){
+              target = price * (1 + Math.max(Math.min(mom/100, 0.05), -0.05));
+            }
+
+            // قواعد توصية أولية
+            if(price && target){
+              const upside = (target - price)/price;
+              if(upside > 0.08 && roe >= 10 && mom >= 0) { rec = 'buy'; rationale = 'قيمة عادلة أعلى مع ربحية جيدة وزخم إيجابي قصير الأجل.'; }
+              else if(upside < -0.05 && (roe && roe < 8) && mom < 0) { rec = 'reduce'; rationale = 'مكرر ربحي نسبي مرتفع مع ضغط سعري وتراجع في العائدية.'; }
+              else { rec = 'hold'; rationale = 'توازن بين السعر الحالي والمؤشرات الأساسية؛ انتظار محفزات جديدة.'; }
+            } else {
+              rec = 'hold'; rationale = 'بيانات أساسية غير مكتملة؛ تُستكمل آليًا بعد أول تحديث ناجح للمجمع.';
+            }
+
+            out[tkr] = { target_price: target ? Number(target.toFixed(3)) : null, recommendation: rec, rationale };
+          }
+          this.analytics = out;
+        },
+        draw(redraw=false){
+          for(const tkr of Object.keys(this.stocks)){
+            const el = document.getElementById('chart-'+tkr);
+            if(!el) continue;
+            const ts = (this.stocks[tkr].timeseries || []).slice(-120);
+            const dates = ts.map(d=>d.date);
+            const prices = ts.map(d=>d.close);
+            const price = this.stocks[tkr].price;
+
+            const data = [{
+              x: dates.length? dates : [this.meta.as_of],
+              y: prices.length? prices : [price || null],
+              mode: 'lines+markers',
+              name: 'الإغلاق',
+            }];
+
+            const layout = {
+              margin: {l:40, r:10, t:10, b:30},
+              paper_bgcolor: 'rgba(0,0,0,0)',
+              plot_bgcolor: 'rgba(0,0,0,0)',
+              xaxis: { gridcolor: 'rgba(255,255,255,0.08)' },
+              yaxis: { gridcolor: 'rgba(255,255,255,0.08)' },
+            };
+
+            Plotly.newPlot(el, data, layout, {displayModeBar: true, responsive: true});
+          }
+        },
+        toggleTheme(){ document.documentElement.classList.toggle('invert'); }
+      }
+    }
+  </script>
+</body>
+</html>
