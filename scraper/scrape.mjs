@@ -14,100 +14,166 @@ const toNumber = (t) => {
   return m ? Number(m[1]) : null;
 };
 
-async function extractMubasher(page, url){
+async function extractMubasher(page, url) {
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
-  // Try to read main price and change
-  const priceSel = 'div.price-big, .box-overview .last-price, .price';
-  const changeSel = 'span.change, .change-percent, .box-overview .change';
   const map = {};
+
+  // Extract price and change percentage
   try {
-    await page.waitForSelector(priceSel, {timeout: 15000});
-    const price = await page.$eval(priceSel, el => el.textContent);
+    await page.waitForSelector('div.market-summary__last-price', { timeout: 15000 });
+    const price = await page.$eval('div.market-summary__last-price', el => el.textContent);
     map.price = toNumber(price);
-  } catch{}
+  } catch (e) {
+    console.error('Could not extract Mubasher price');
+  }
 
   try {
-    const change = await page.$eval(changeSel, el => el.textContent);
-    map.change_pct = (()=>{
+    const change = await page.$eval('div.market-summary__change-percentage', el => el.textContent);
+    map.change_pct = (() => {
       const m = clean(change).match(/([\-+]?\d+(?:\.\d+)?)%/);
       return m ? Number(m[1]) : null;
     })();
-  } catch{}
+  } catch (e) {
+    console.error('Could not extract Mubasher change %');
+  }
 
-  // Grab table stats labels (Open, High, Low, Volume, Turnover, P/E, EPS, Market Cap)
-  const possibleLabels = ['Open','High','Low','Volume','Turnover','P/E Ratio','EPS','Market Cap','Par Value','Book Value','P/B Ratio'];
-  const rows = await page.$$eval('table, .stock-statistics, .company-statistics, .table', tables => {
-    const res = [];
-    const getText = (el) => (el?.innerText || '').trim();
-    for(const t of tables){
-      const trs = t.querySelectorAll('tr');
-      for(const tr of trs){
-        const cells = Array.from(tr.querySelectorAll('th,td')).map(getText);
-        if(cells.length>=2) res.push(cells);
+  // Extract key-value stats from the page
+  const stats = await page.evaluate(() => {
+    const data = [];
+    const rows = document.querySelectorAll('.market-summary__block-row, .stock-overview__text-and-value-item');
+
+    rows.forEach(row => {
+      const labelEl = row.querySelector('.market-summary__block-text, .stock-overview__text');
+      const valueEl = row.querySelector('.market-summary__block-number, .stock-overview__value');
+
+      if (labelEl && valueEl) {
+        const key = labelEl.innerText.trim();
+        const value = valueEl.innerText.trim();
+        data.push([key, value]);
       }
-    }
-    return res;
+    });
+    return data;
   });
 
-  for(const [k,v] of rows){
+  // Map extracted stats to our data structure
+  for (const [k, v] of stats) {
     const key = clean(k);
     const val = clean(v);
-    if(/Open/i.test(key)) map.open = toNumber(val);
-    if(/High/i.test(key)) map.high = toNumber(val);
-    if(/Low/i.test(key)) map.low = toNumber(val);
-    if(/Volume/i.test(key)) map.volume = toNumber(val);
-    if(/Turnover/i.test(key) || /Value/i.test(key)) map.turnover = toNumber(val);
-    if(/P\/E/i.test(key)) map.pe_ttm = toNumber(val);
-    if(/EPS/i.test(key)) map.eps_ttm = toNumber(val);
-    if(/Market Cap/i.test(key)) map.market_cap = toNumber(val);
+    if (/Open/i.test(key)) map.open = toNumber(val);
+    if (/High/i.test(key)) map.high = toNumber(val);
+    if (/Low/i.test(key)) map.low = toNumber(val);
+    if (/Volume/i.test(key)) map.volume = toNumber(val);
+    if (/Turnover/i.test(key)) map.turnover = toNumber(val);
+    if (/P\/E Ratio/i.test(key)) map.pe_ttm = toNumber(val);
+    if (/EPS/i.test(key)) map.eps_ttm = toNumber(val);
+    if (/Market Cap/i.test(key)) map.market_cap = toNumber(val);
   }
+
   return map;
 }
 
-async function extractDFMTradingSummary(page, url){
+async function extractDFMTradingSummary(page, url) {
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
-  // The summary page often has labeled entries we can read by text
-  const fields = ['Open Price','Closing Price','High','Low','Best Bid','Bid Vol','Last Price','Value','Market Cap','Last Traded'];
   const data = {};
-  // Try all spans/divs and map nearest label/value pairs
-  const pairs = await page.$$eval('body *', nodes => nodes.map(n => n.textContent?.trim()).filter(Boolean));
-  const get = (label) => {
-    const idx = pairs.findIndex(t => t.toLowerCase().includes(label.toLowerCase()));
-    if(idx>=0){
-      // next non-empty value
-      for(let j=idx+1;j<Math.min(idx+6, pairs.length);j++){
-        const v = pairs[j];
-        if(v && !/[a-zA-Z]+/.test(v) || /\d/.test(v)) return v;
-      }
-    }
-    return null;
-  };
-  data.open = toNumber(get('Open'));
-  data.high = toNumber(get('High'));
-  data.low = toNumber(get('Low'));
-  data.price = toNumber(get('Last Price')) || toNumber(get('Closing Price'));
-  data.turnover = toNumber(get('Value'));
-  data.market_cap = toNumber(get('Market Cap'));
+
+  try {
+    await page.waitForSelector('.table-flex', { timeout: 15000 });
+
+    const stats = await page.evaluate(() => {
+      const extracted = {};
+      const cols = document.querySelectorAll('.table-flex .t-col');
+      cols.forEach(col => {
+        const headEl = col.querySelector('.t-head');
+        const valueEl = headEl ? headEl.nextElementSibling : null;
+        if (headEl && valueEl) {
+          const key = headEl.innerText.trim();
+          const value = valueEl.innerText.trim();
+          extracted[key] = value;
+        }
+      });
+      return extracted;
+    });
+
+    data.open = toNumber(stats['Open Price']);
+    data.high = toNumber(stats['High']);
+    data.low = toNumber(stats['Low']);
+    data.price = toNumber(stats['Closing Price']) || toNumber(stats['Last Price']);
+    data.turnover = toNumber(stats['Value']);
+    data.market_cap = toNumber(stats['Market Cap']);
+    data.volume = toNumber(stats['Volume']);
+
+  } catch (e) {
+    console.error('Could not extract DFM summary', e);
+  }
+
   return data;
 }
 
-async function extractADX(page, symbol="NMDCENR"){
-  const url = `https://www.adx.ae/en/main-market/company-profile/overview?secCode=${symbol}&symbols=${symbol}`;
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
-  const data = {};
-  // Try to capture Last Price, High, Low, Volume, Turnover
-  const text = await page.evaluate(()=>document.body.innerText);
-  const val = (label)=>{
-    const re = new RegExp(label + "\\s*:?\\s*([0-9.,]+)", "i");
-    const m = text.match(re);
-    return m ? m[1] : null;
-  };
-  data.price = toNumber(val('Last Price'));
-  data.high = toNumber(val('High'));
-  data.low = toNumber(val('Low'));
-  data.volume = toNumber(val('Volume'));
-  data.turnover = toNumber(val('Turnover'));
-  return data;
+async function extractADX(page, symbol = "NMDCENR") {
+    const url = `https://www.adx.ae/en/main-market/company-profile/overview?secCode=${symbol}&symbols=${symbol}`;
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
+
+    try {
+        await page.waitForSelector('.adx-financials-chart_details', { timeout: 20000 });
+
+        const stats = await page.evaluate(() => {
+            const data = {};
+
+            const findStat = (label) => {
+                const allHeadings = document.querySelectorAll('h3');
+                for (const h3 of allHeadings) {
+                    if (h3.innerText.trim().toLowerCase() === label.toLowerCase()) {
+                        const valueEl = h3.nextElementSibling;
+                        return valueEl ? valueEl.innerText.trim() : null;
+                    }
+                }
+                return null;
+            };
+
+            const priceEl = document.querySelector('.price-info_count');
+            if (priceEl) {
+                data['Last Price'] = priceEl.childNodes[0].nodeValue.trim();
+                const changeEl = priceEl.querySelector('.price-info_change');
+                if (changeEl) data['Change %'] = changeEl.innerText.trim();
+            }
+
+            data['Market Cap'] = findStat('MARKET CAP.');
+            data['Open Price'] = findStat('OPEN PRICE');
+            data['Prev. Close'] = findStat('PREV CLOSE');
+
+            const firstRow = document.querySelector('.adx-recent-trades_table tbody tr');
+            if (firstRow) {
+                const cells = firstRow.querySelectorAll('td');
+                if (cells.length >= 8) {
+                    data['High'] = cells[3].innerText.trim();
+                    data['Low'] = cells[2].innerText.trim();
+                    data['Volume'] = cells[6].innerText.trim();
+                    data['Turnover'] = cells[5].innerText.trim();
+                }
+            }
+
+            return data;
+        });
+
+        const finalData = {};
+        finalData.price = toNumber(stats['Last Price']) || toNumber(stats['Prev. Close']);
+        if (stats['Change %']) {
+            const m = clean(stats['Change %']).match(/([\-+]?\d+(?:\.\d+)?)%/);
+            finalData.change_pct = m ? Number(m[1]) : null;
+        }
+        finalData.open = toNumber(stats['Open Price']);
+        finalData.high = toNumber(stats['High']);
+        finalData.low = toNumber(stats['Low']);
+        finalData.volume = toNumber(stats['Volume']);
+        finalData.turnover = toNumber(stats['Turnover']);
+        finalData.market_cap = toNumber(stats['Market Cap']);
+
+        return finalData;
+
+    } catch (e) {
+        console.error(`Could not extract ADX data for ${symbol}`, e);
+        return {};
+    }
 }
 
 async function main(){
